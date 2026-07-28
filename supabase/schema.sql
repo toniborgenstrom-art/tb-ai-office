@@ -132,6 +132,27 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+-- The first workspace is also created for any users that existed before this schema ran.
+do $$
+declare
+  existing_user record;
+  new_company_id uuid;
+begin
+  for existing_user in
+    select au.id, au.email, au.raw_user_meta_data
+    from auth.users au
+    where not exists (select 1 from public.users u where u.id = au.id)
+  loop
+    insert into public.companies (name)
+    values (coalesce(existing_user.raw_user_meta_data ->> 'company_name', 'Oma työtila'))
+    returning id into new_company_id;
+
+    insert into public.users (id, company_id, full_name, role)
+    values (existing_user.id, new_company_id, coalesce(existing_user.raw_user_meta_data ->> 'full_name', existing_user.email), 'owner');
+  end loop;
+end;
+$$;
+
 create policy "users read own profile" on users for select using (id = auth.uid());
 create policy "users update own profile" on users for update using (id = auth.uid()) with check (id = auth.uid());
 create policy "members read their company" on companies for select using (is_company_member(id));
