@@ -96,4 +96,51 @@ alter table tasks enable row level security;
 alter table ai_messages enable row level security;
 alter table notifications enable row level security;
 
--- Add company-scoped policies after the first Supabase user and company bootstrap flow is implemented.
+create or replace function public.is_company_member(target_company_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.users
+    where id = auth.uid() and company_id = target_company_id
+  );
+$$;
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_company_id uuid;
+begin
+  insert into public.companies (name)
+  values (coalesce(new.raw_user_meta_data ->> 'company_name', 'Oma työtila'))
+  returning id into new_company_id;
+
+  insert into public.users (id, company_id, full_name, role)
+  values (new.id, new_company_id, coalesce(new.raw_user_meta_data ->> 'full_name', new.email), 'owner');
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+create policy "users read own profile" on users for select using (id = auth.uid());
+create policy "users update own profile" on users for update using (id = auth.uid()) with check (id = auth.uid());
+create policy "members read their company" on companies for select using (is_company_member(id));
+create policy "owners update their company" on companies for update using (is_company_member(id));
+
+create policy "members manage customers" on customers for all using (is_company_member(company_id)) with check (is_company_member(company_id));
+create policy "members manage projects" on projects for all using (is_company_member(company_id)) with check (is_company_member(company_id));
+create policy "members manage offers" on offers for all using (is_company_member(company_id)) with check (is_company_member(company_id));
+create policy "members manage documents" on documents for all using (is_company_member(company_id)) with check (is_company_member(company_id));
+create policy "members manage tasks" on tasks for all using (is_company_member(company_id)) with check (is_company_member(company_id));
+create policy "members manage ai messages" on ai_messages for all using (is_company_member(company_id)) with check (is_company_member(company_id));
+create policy "members manage notifications" on notifications for all using (is_company_member(company_id)) with check (is_company_member(company_id));

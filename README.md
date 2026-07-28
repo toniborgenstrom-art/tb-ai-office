@@ -20,7 +20,14 @@ TB AI Office on LVI-Valvonta T.B:n AI-tuettu työtila tarjouksille, asiakkaille,
 
 ## Supabase
 
-Luo Supabase-projekti ja aja [supabase/schema.sql](supabase/schema.sql) SQL Editorissa. Lisää sen URL ja anon key `.env.local`-tiedostoon. RLS on otettu käyttöön; ennen tuotantokäyttöä lisätään käyttäjä- ja yrityskohtaiset käyttöoikeussäännöt.
+Luo Supabase-projekti ja aja [supabase/schema.sql](supabase/schema.sql) SQL Editorissa. Lisää sen URL ja publishable key `.env.local`-tiedostoon:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+```
+
+Ota Supabase Authissa käyttöön sähköpostikirjautuminen ja lisää redirect URL `http://localhost:3000/auth/callback`. Skeema luo jokaiselle uudelle käyttäjälle oman työtilan ja suojaa tiedot yrityskohtaisilla RLS-säännöillä.
 
 ## Tarjousvahti
 
