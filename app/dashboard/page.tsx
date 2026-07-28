@@ -2,6 +2,7 @@ import { Shell } from "@/components/dashboard/shell";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Chat } from "@/components/dashboard/chat";
 import { getDashboardData } from "@/lib/dashboard/data";
+import { QuickCreate } from "@/components/dashboard/quick-create";
 
 export default async function Dashboard() {
   const data = await getDashboardData();
@@ -16,7 +17,7 @@ export default async function Dashboard() {
   return <Shell>
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div><p className="text-sm text-[#78e69d]">TB AI Office</p><h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">Hei {data?.name || ""} <span aria-hidden>👋</span></h1><p className="mt-2 text-sm text-[#9fb3a8]">Tässä on työtilasi tilanne juuri nyt.</p></div>
-      <button className="rounded-xl bg-[#78e69d] px-4 py-2.5 text-sm font-semibold text-[#07110b]">+ Uusi tehtävä</button>
+      <QuickCreate />
     </header>
     <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <StatCard label="Tarjouspyynnöt" value={String(data?.newOffers ?? 0)} detail="Uudet käsiteltävät" tone="green" />
