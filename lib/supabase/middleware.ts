@@ -2,6 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
+  // Server-to-server integrations authenticate with their own request secret.
+  // They cannot carry a browser Supabase session, so do not redirect them to
+  // the sign-in page (a POST redirect becomes a 405 response).
+  if (request.nextUrl.pathname.startsWith("/api/integrations/")) {
+    return NextResponse.next({ request });
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return NextResponse.next({ request });
