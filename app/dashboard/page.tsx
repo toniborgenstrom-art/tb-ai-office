@@ -43,6 +43,11 @@ export default async function Dashboard() {
       </div>
     </section>
 
+    <section className="mt-8 border border-[#d6dee7] border-t-4 border-t-[#1f6b56] bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-[#1f6b56]">Tarjousvahdin ilmoitukset</p><h2 className="mt-2 text-xl font-semibold text-[#142b45]">Sopivat tarjouspyynnöt</h2></div><Link href="/tarjoukset" className="text-sm font-semibold underline">Avaa Tarjousvahti</Link></div>
+      {data?.suitableOffers.length ? <div className="mt-5 divide-y divide-[#e4e9ef]">{data.suitableOffers.map((offer) => <Link key={offer.id} href="/tarjoukset" className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0"><div><p className="font-semibold">{offer.title}</p><p className="mt-1 text-sm text-[#607188]">{[offer.serviceType, offer.region].filter(Boolean).join(" · ") || "Täydennä kohdetiedot"} · {offer.recommendation}</p></div><span className="rounded bg-[#e4f4ea] px-3 py-2 text-sm font-semibold text-[#1f6b56]">{offer.fit} % sopivuus</span></Link>)}</div> : <p className="mt-5 text-sm text-[#607188]">Ei vielä AI:n hyvin sopiviksi arvioimia tarjouspyyntöjä. Arvioi kohde Tarjousvahdissa.</p>}
+    </section>
+
     <section className="mt-8 border border-[#d6dee7] border-t-4 border-t-[#d9ae16] bg-white p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#a67a00]">Yhtenäinen työnkulku</p>
       <h2 className="mt-2 text-xl font-semibold text-[#142b45]">Kohde yhdistää työkalut</h2>
