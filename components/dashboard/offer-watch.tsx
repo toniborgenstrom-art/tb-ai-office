@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export type WatchedOffer = { id: string; title: string; source: string | null; fitScore: number | null; description: string; region: string; address: string; serviceType: string; sourceUrl: string; deadline: string; reasons: string[]; estimate: string; recommendation: string };
 
@@ -38,7 +39,16 @@ export function OfferWatch({ offers }: { offers: WatchedOffer[] }) {
 
   async function syncHilma() {
     setSyncing(true); setError("");
-    const response = await fetch("/api/hilma/sync", { method: "POST" });
+    const { data: { session } } = await createClient().auth.getSession();
+    if (!session?.access_token) {
+      setError("Kirjaudu uudelleen ennen Hilma-hakua.");
+      setSyncing(false);
+      return;
+    }
+    const response = await fetch("/.netlify/functions/hilma-manual", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
     const data = await response.json();
     if (!response.ok) setError(data.error || "Hilma-haku epäonnistui.");
     else { setError(`Hilma tarkistettu: ${data.found} ilmoitusta, ${data.imported} uutta tallennettu.`); router.refresh(); }
