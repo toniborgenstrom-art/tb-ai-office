@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type Env = (name: string) => string | undefined;
 type HilmaRow = Record<string, unknown>;
@@ -56,10 +56,9 @@ function adminClient(env: Env) {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-export async function syncHilmaForCompany(companyId: string, env: Env = (name) => process.env[name]) {
-  const admin = adminClient(env);
+export async function syncHilmaWithClient(database: SupabaseClient, companyId: string, env: Env = (name) => process.env[name]) {
   const rows = await searchHilma(env);
-  const { data: existing, error: existingError } = await admin.from("offers").select("id,content").eq("company_id", companyId).eq("source", "Hilma");
+  const { data: existing, error: existingError } = await database.from("offers").select("id,content").eq("company_id", companyId).eq("source", "Hilma");
   if (existingError) throw new Error(existingError.message);
   const known = new Set((existing ?? []).flatMap((offer) => {
     try { const id = JSON.parse(offer.content ?? "{}").hilmaNoticeId; return typeof id === "string" ? [id] : []; } catch { return []; }
@@ -72,11 +71,15 @@ export async function syncHilmaForCompany(companyId: string, env: Env = (name) =
     const info = details(row);
     if (!info.matchingKeywords.length) continue;
     const content = JSON.stringify({ hilmaNoticeId: id, description: `${info.matchingKeywords.join(", ")} · Hilmasta haettu tarjouspyyntö.`, region: info.region, address: info.address, serviceType: info.matchingKeywords[0], sourceUrl: info.url, deadline: info.deadline, publishedAt: info.published, reasons: ["Hilman haku löysi palveluasi vastaavan avainsanan", info.region ? `Alue: ${info.region}` : "Alue tarkistettava ilmoituksesta"], estimate: "Arvioitava tarjousasiakirjoista", recommendation: "Selvitä lisää", hilmaIndexRow: row });
-    const { error } = await admin.from("offers").insert({ company_id: companyId, title: info.title, source: "Hilma", status: "new", fit_score: info.fit, content });
+    const { error } = await database.from("offers").insert({ company_id: companyId, title: info.title, source: "Hilma", status: "new", fit_score: info.fit, content });
     if (error) throw new Error(error.message);
     imported += 1;
   }
   return { found: rows.length, imported };
+}
+
+export async function syncHilmaForCompany(companyId: string, env: Env = (name) => process.env[name]) {
+  return syncHilmaWithClient(adminClient(env), companyId, env);
 }
 
 export async function syncHilmaForAllCompanies(env: Env) {
