@@ -4,13 +4,15 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   const { supabase, companyId, error } = await getCurrentWorkspace();
   if (error || !companyId) return NextResponse.json({ error }, { status: 401 });
-  const { title, description, region, source, sourceUrl, deadline } = await request.json();
+  const { title, description, region, address, serviceType, source, sourceUrl, deadline } = await request.json();
   if (typeof title !== "string" || !title.trim() || typeof description !== "string" || !description.trim()) {
     return NextResponse.json({ error: "Täytä vähintään tarjouspyynnön nimi ja kuvaus." }, { status: 400 });
   }
   const content = JSON.stringify({
     description: description.trim(),
     region: typeof region === "string" ? region.trim() : "",
+    address: typeof address === "string" ? address.trim() : "",
+    serviceType: typeof serviceType === "string" ? serviceType.trim() : "",
     sourceUrl: typeof sourceUrl === "string" ? sourceUrl.trim() : "",
     deadline: typeof deadline === "string" ? deadline : "",
     reasons: [],

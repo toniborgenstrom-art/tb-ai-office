@@ -11,7 +11,11 @@ export default async function Offers() {
   const { data } = await supabase.from("offers").select("id,title,source,fit_score,content").order("created_at", { ascending: false });
   const offers: WatchedOffer[] = (data ?? []).map((offer) => {
     const content = parseContent(offer.content);
-    return { id: offer.id, title: offer.title, source: offer.source, fitScore: offer.fit_score, description: content.description || "Kuvausta ei ole lisätty.", region: content.region || "", sourceUrl: content.sourceUrl || "", deadline: content.deadline || "", reasons: Array.isArray(content.reasons) ? content.reasons : [], estimate: content.estimate || "", recommendation: content.recommendation || "Arvioimatta" };
+    return {
+      id: offer.id, title: offer.title, source: offer.source, fitScore: offer.fit_score,
+      description: content.description || "Kuvausta ei ole lisätty.", region: content.region || "", address: content.address || "", serviceType: content.serviceType || "",
+      sourceUrl: content.sourceUrl || "", deadline: content.deadline || "", reasons: Array.isArray(content.reasons) ? content.reasons : [], estimate: content.estimate || "", recommendation: content.recommendation || "Arvioimatta"
+    };
   });
   return <Shell><OfferWatch offers={offers} /></Shell>;
 }

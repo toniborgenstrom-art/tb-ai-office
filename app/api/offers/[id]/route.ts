@@ -10,7 +10,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const input = await request.json();
   let previous: Record<string, unknown> = {};
   try { previous = JSON.parse(offer.content ?? "{}"); } catch { previous = { description: offer.content ?? "" }; }
-  const content = JSON.stringify({ ...previous, description: typeof input.description === "string" ? input.description.trim() : previous.description, region: typeof input.region === "string" ? input.region.trim() : previous.region, sourceUrl: typeof input.sourceUrl === "string" ? input.sourceUrl.trim() : previous.sourceUrl, deadline: typeof input.deadline === "string" ? input.deadline : previous.deadline });
+  const content = JSON.stringify({ ...previous, description: typeof input.description === "string" ? input.description.trim() : previous.description, region: typeof input.region === "string" ? input.region.trim() : previous.region, address: typeof input.address === "string" ? input.address.trim() : previous.address, serviceType: typeof input.serviceType === "string" ? input.serviceType.trim() : previous.serviceType, sourceUrl: typeof input.sourceUrl === "string" ? input.sourceUrl.trim() : previous.sourceUrl, deadline: typeof input.deadline === "string" ? input.deadline : previous.deadline });
   const payload: Record<string, string | number | null> = {
     title: typeof input.title === "string" && input.title.trim() ? input.title.trim() : undefined,
     source: typeof input.source === "string" ? input.source.trim() : offer.source,
