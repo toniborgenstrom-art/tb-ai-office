@@ -21,6 +21,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (typeof input.offerNumber === "string") payload.offer_number = input.offerNumber.trim() || null;
   if (input.amount !== undefined) payload.amount = input.amount === "" || input.amount === null ? null : Number(input.amount);
   if (typeof input.expiresAt === "string") payload.expires_at = input.expiresAt || null;
+  if ("projectId" in input) {
+    if (typeof input.projectId !== "string" || !input.projectId) {
+      payload.project_id = null;
+      payload.customer_id = null;
+    } else {
+      const { data: project } = await supabase.from("projects").select("id,customer_id").eq("id", input.projectId).eq("company_id", companyId).maybeSingle();
+      if (!project) return NextResponse.json({ error: "Kohdetta ei löydy työtilasta." }, { status: 404 });
+      payload.project_id = project.id;
+      payload.customer_id = project.customer_id;
+    }
+  }
   const { error: updateError } = await supabase.from("offers").update(payload).eq("id", id).eq("company_id", companyId);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
   return NextResponse.json({ ok: true });
