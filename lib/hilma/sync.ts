@@ -14,8 +14,12 @@ function noticeId(row: HilmaRow) {
   return firstText(row, ["id", "noticeId", "notice_id", "identifier", "ocid"]);
 }
 
-function flatten(row: HilmaRow) {
-  return Object.values(row).flatMap((value) => Array.isArray(value) ? value.map(String) : typeof value === "object" && value ? Object.values(value as Record<string, unknown>).map(String) : [String(value ?? "")]).join(" ");
+function flatten(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(flatten).join(" ");
+  if (typeof value === "object") return Object.values(value as Record<string, unknown>).map(flatten).join(" ");
+  return "";
 }
 
 function details(row: HilmaRow) {
@@ -45,7 +49,7 @@ async function searchHilma(env: Env) {
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { throw new Error("Hilma-haku palautti virheellisen vastauksen."); }
   const object = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {};
-  const rows = Array.isArray(object.value) ? object.value : Array.isArray(object.notices) ? object.notices : [];
+  const rows = Array.isArray(object.value) ? object.value : Array.isArray(object.notices) ? object.notices : Array.isArray(object.results) ? object.results : Array.isArray(object.items) ? object.items : Array.isArray(object.data) ? object.data : Array.isArray(parsed) ? parsed : [];
   return rows.filter((row): row is HilmaRow => !!row && typeof row === "object");
 }
 
@@ -65,17 +69,21 @@ export async function syncHilmaWithClient(database: SupabaseClient, companyId: s
   }));
 
   let imported = 0;
+  let relevant = 0;
   for (const row of rows) {
     const id = noticeId(row);
     if (!id || known.has(id)) continue;
     const info = details(row);
-    if (!info.matchingKeywords.length) continue;
+    // Azure Search has already matched the row to our LVI query. Some index
+    // fields are nested and don't repeat the matching phrase verbatim.
+    if (!info.matchingKeywords.length) info.matchingKeywords.push("Hilma-haku");
+    relevant += 1;
     const content = JSON.stringify({ hilmaNoticeId: id, description: `${info.matchingKeywords.join(", ")} · Hilmasta haettu tarjouspyyntö.`, region: info.region, address: info.address, serviceType: info.matchingKeywords[0], sourceUrl: info.url, deadline: info.deadline, publishedAt: info.published, reasons: ["Hilman haku löysi palveluasi vastaavan avainsanan", info.region ? `Alue: ${info.region}` : "Alue tarkistettava ilmoituksesta"], estimate: "Arvioitava tarjousasiakirjoista", recommendation: "Selvitä lisää", hilmaIndexRow: row });
     const { error } = await database.from("offers").insert({ company_id: companyId, title: info.title, source: "Hilma", status: "new", fit_score: info.fit, content });
     if (error) throw new Error(error.message);
     imported += 1;
   }
-  return { found: rows.length, imported };
+  return { found: rows.length, relevant, imported };
 }
 
 export async function syncHilmaForCompany(companyId: string, env: Env = (name) => process.env[name]) {
@@ -87,5 +95,5 @@ export async function syncHilmaForAllCompanies(env: Env) {
   const { data: companies, error } = await admin.from("companies").select("id");
   if (error) throw new Error(error.message);
   const results = await Promise.all((companies ?? []).map((company) => syncHilmaForCompany(company.id, env)));
-  return { workspaces: results.length, found: results.reduce((sum, item) => sum + item.found, 0), imported: results.reduce((sum, item) => sum + item.imported, 0) };
+  return { workspaces: results.length, found: results.reduce((sum, item) => sum + item.found, 0), relevant: results.reduce((sum, item) => sum + item.relevant, 0), imported: results.reduce((sum, item) => sum + item.imported, 0) };
 }

@@ -48,6 +48,7 @@ export function OfferWatch({ offers }: { offers: WatchedOffer[] }) {
     const response = await fetch("/.netlify/functions/hilma-manual", {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}` },
+      signal: AbortSignal.timeout(35_000),
     });
     const data = await response.json();
     if (!response.ok) setError(data.error || "Hilma-haku epäonnistui.");
