@@ -1,0 +1,5 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+const labels: Record<string, string> = { offer: "Tarjousvaihe", active: "Käynnissä", completed: "Valmis" };
+export function ProjectStatus({ id, status }: { id: string; status: string }) { const router = useRouter(); const [saving, setSaving] = useState(false); async function change(nextStatus: string) { setSaving(true); await fetch(`/api/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: nextStatus }) }); setSaving(false); router.refresh(); } return <div className="flex flex-wrap items-center gap-2"><span className="rounded bg-[#eef3f7] px-2.5 py-1 text-xs font-semibold text-[#52657c]">{labels[status] ?? status}</span>{status === "offer" && <button disabled={saving} onClick={() => change("active")} className="text-xs font-semibold text-[#142b45] underline">Aseta käynnissä</button>}{status === "active" && <button disabled={saving} onClick={() => change("completed")} className="text-xs font-semibold text-[#142b45] underline">Merkitse valmiiksi</button>}</div>; }

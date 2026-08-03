@@ -2,7 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+:root { color-scheme: light; }
 * { box-sizing: border-box; }
-body { margin: 0; background: #09100e; color: #eaf3ed; font-family: Arial, Helvetica, sans-serif; }
+body { margin: 0; background: #eef2f6; color: #142b45; font-family: Arial, Helvetica, sans-serif; }
 button, input { font: inherit; }
+
+/* Legacy view classes retain the shared LVI-Valvonta visual system. */
+[class*="bg-[#101d18]"] { background-color: #fff !important; }
+[class*="border-white/10"] { border-color: #d6dee7 !important; }
+[class*="border-white/5"] { border-color: #e4e9ef !important; }
+[class*="text-[#9fb3a8]"], [class*="text-[#b8c9be]"] { color: #607188 !important; }
+[class*="text-[#78e69d]"] { color: #9a7300 !important; }
+[class*="bg-[#78e69d]"] { background-color: #d9ae16 !important; }
+[class*="text-[#07110b]"] { color: #142b45 !important; }
