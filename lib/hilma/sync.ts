@@ -1,12 +1,12 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { defaultOfferWatchSettings, toOfferWatchSettings, type OfferWatchSettings } from "@/lib/offer-watch-settings";
 
 type Env = (name: string) => string | undefined;
 type HilmaRow = Record<string, unknown>;
 
 const DEFAULT_SEARCH_URL = "https://api.hankintailmoitukset.fi/avp/notices/docs/search";
 const DEFAULT_NOTICE_URL = "https://api.hankintailmoitukset.fi/avp-notice/api/avp/notices/";
-const keywords = ["LVI-valvonta", "KVV-työnjohtaja", "IV-työnjohtaja", "rakennuttajakonsultti", "talotekniikka", "valvoja", "kuntotutkimus", "sisäilma", "korjaussuunnittelu"];
-const regions = ["Uusimaa", "Kanta-Häme", "Päijät-Häme", "Pirkanmaa"];
+const searchKeywords = defaultOfferWatchSettings.serviceKeywords;
 
 const text = (value: unknown) => typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
 const normal = (value: string) => value.toLocaleLowerCase("fi").replace(/[^a-z0-9]/g, "");
@@ -47,19 +47,20 @@ function deepText(value: unknown, keys: string[]): string {
   return "";
 }
 
-function details(row: HilmaRow) {
+function details(row: HilmaRow, settings: OfferWatchSettings) {
   const searchable = flatten(row);
   const title = firstText(row, ["title", "titleFi", "noticeTitle", "name", "object"]) || deepText(row, ["procurementTitle", "procedureTitle", "title", "titleFi", "name"]) || "Hilman hankintailmoitus";
   const description = firstText(row, ["shortDescription", "description", "summary"]) || deepText(row, ["shortDescription", "procurementDescription", "description", "objectDescription"]);
   const buyer = firstText(row, ["buyer", "buyerName", "officialName", "organisationName"]) || deepText(row, ["officialName", "buyerName", "contractingAuthorityName", "organisationName"]);
-  const region = regions.find((name) => searchable.toLocaleLowerCase("fi").includes(name.toLocaleLowerCase("fi"))) ?? (firstText(row, ["region", "location", "municipality", "nuts"]) || deepText(row, ["region", "municipality", "city", "placePerformance", "nutsCodes"]));
+  const matchedRegion = settings.regions.find((name) => searchable.toLocaleLowerCase("fi").includes(name.toLocaleLowerCase("fi")));
+  const region = matchedRegion ?? (firstText(row, ["region", "location", "municipality", "nuts"]) || deepText(row, ["region", "municipality", "city", "placePerformance", "nutsCodes"]));
   const address = firstText(row, ["address", "addressText", "municipality", "city", "location"]) || deepText(row, ["address", "addressText", "municipality", "city", "place"]);
   const deadline = firstText(row, ["deadline", "deadlineDate", "submissionDeadline", "tenderDeadline"]) || deepText(row, ["tendersOrRequestsToParticipateDueDateTime", "submissionDeadline", "tenderDeadline", "deadline"]);
   const published = firstText(row, ["publicationDate", "published", "publication_date"]) || deepText(row, ["publicationDate", "publishedInHilma", "published"]);
   const url = firstText(row, ["url", "noticeUrl", "link", "publicUrl", "procurementDocumentsUrl"]) || deepText(row, ["noticeUrl", "publicUrl", "procurementDocumentsUrl", "url", "link"]);
-  const matchingKeywords = keywords.filter((keyword) => searchable.toLocaleLowerCase("fi").includes(keyword.toLocaleLowerCase("fi")));
-  const fit = Math.min(90, 30 + matchingKeywords.length * 14 + (regions.includes(region) ? 15 : 0) + (description ? 5 : 0));
-  return { title, description, buyer, region, address, deadline, published, url, matchingKeywords, fit };
+  const matchingKeywords = settings.serviceKeywords.filter((keyword) => searchable.toLocaleLowerCase("fi").includes(keyword.toLocaleLowerCase("fi")));
+  const fit = Math.min(100, 30 + matchingKeywords.length * 14 + (matchedRegion ? 15 : 0) + (description ? 5 : 0));
+  return { title, description, buyer, region, address, deadline, published, url, matchingKeywords, matchedRegion, fit };
 }
 
 function rowsFromResponse(parsed: unknown) {
@@ -81,7 +82,7 @@ async function searchHilma(env: Env) {
   const parsed = await hilmaJson(env("HILMA_SEARCH_API_URL") || DEFAULT_SEARCH_URL, env, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ search: keywords.join(" OR "), searchMode: "any", select: "id", orderby: "datePublished desc", top: 25, count: true }),
+    body: JSON.stringify({ search: searchKeywords.join(" OR "), searchMode: "any", select: "id", orderby: "datePublished desc", top: 25, count: true }),
   });
   return rowsFromResponse(parsed);
 }
@@ -128,7 +129,32 @@ function adminClient(env: Env) {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+async function loadSettings(database: SupabaseClient, companyId: string) {
+  const { data, error } = await database.from("offer_watch_settings").select("*").eq("company_id", companyId).maybeSingle();
+  // Keep the existing watch working before the migration has been applied.
+  if (error) return defaultOfferWatchSettings;
+  return toOfferWatchSettings(data);
+}
+
+async function createOfferNotification(database: SupabaseClient, companyId: string, settings: OfferWatchSettings, info: ReturnType<typeof details>, env: Env) {
+  const body = [info.buyer, info.region, info.deadline ? `Määräaika ${info.deadline}` : ""].filter(Boolean).join(" · ");
+  await database.from("notifications").insert({ company_id: companyId, title: `Uusi sopiva tarjouspyyntö: ${info.title}`, body, channel: "in_app" });
+  if (!settings.emailNotificationsEnabled || !settings.notificationEmail) return;
+  const apiKey = env("RESEND_API_KEY");
+  const from = env("OFFER_WATCH_EMAIL_FROM");
+  if (!apiKey || !from) return;
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [settings.notificationEmail], subject: `TB AI Office: ${info.title}`, text: `${body}\n\nAvaa TB AI Office ja tarkista tarjouspyyntö.` }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch { /* The in-app notification remains available if e-mail is temporarily unavailable. */ }
+}
+
 export async function syncHilmaWithClient(database: SupabaseClient, companyId: string, env: Env = (name) => process.env[name]) {
+  const settings = await loadSettings(database, companyId);
   const rows = await searchHilma(env);
   const { data: existing, error: existingError } = await database.from("offers").select("id,title,content").eq("company_id", companyId).eq("source", "Hilma");
   if (existingError) throw new Error(existingError.message);
@@ -154,13 +180,14 @@ export async function syncHilmaWithClient(database: SupabaseClient, companyId: s
     const current = known.get(id);
     if (current?.detailed) { relevant += 1; continue; }
     const notice = bodies.get(id);
-    const info = details({ ...row, ...(notice ?? {}) });
+    const info = details({ ...row, ...(notice ?? {}) }, settings);
     // A search-index hit is not automatically relevant. Do not create a
     // generic card for old or unrelated notices; only persisted notices must
     // contain an actual service keyword from their full notice body.
     if (!info.matchingKeywords.length) continue;
     if (!hasNoticeBody(notice)) continue;
     if (!isFinnishAndOpen(notice, info.deadline)) continue;
+    if (!info.matchedRegion || info.fit < settings.minFitScore) continue;
     relevant += 1;
     const description = info.description || `${info.matchingKeywords.join(", ")} · Hilmasta haettu tarjouspyyntö.`;
     const reasons = [
@@ -175,7 +202,11 @@ export async function syncHilmaWithClient(database: SupabaseClient, companyId: s
       ? await database.from("offers").update(values).eq("id", current.id).eq("company_id", companyId)
       : await database.from("offers").insert({ company_id: companyId, ...values });
     if (error) throw new Error(error.message);
-    if (current) updated += 1; else imported += 1;
+    if (current) updated += 1;
+    else {
+      imported += 1;
+      await createOfferNotification(database, companyId, settings, info, env);
+    }
   }
   return { found: rows.length, relevant, imported, updated };
 }

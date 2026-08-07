@@ -4,6 +4,7 @@ const links = [
   ["Dashboard", "/dashboard", "▦"],
   ["Tarjousvahti", "/tarjoukset", "◉"],
   ["Tarjoukset", "/tarjouskanta", "✉"],
+  ["Asetukset", "/asetukset", "⚙"],
   ["Kohteet", "/asiakkaat", "⌂"],
   ["Agentit", "/agentit", "✦"],
   ["Dokumentit", "/dokumentit", "▤"],
