@@ -13,6 +13,7 @@ create table if not exists public.document_ai_reviews (
 
 alter table public.document_ai_reviews enable row level security;
 
+drop policy if exists "members manage document AI reviews" on public.document_ai_reviews;
 create policy "members manage document AI reviews"
 on public.document_ai_reviews for all to authenticated
 using (public.is_company_member(company_id))
