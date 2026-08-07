@@ -81,7 +81,7 @@ async function searchHilma(env: Env) {
   const parsed = await hilmaJson(env("HILMA_SEARCH_API_URL") || DEFAULT_SEARCH_URL, env, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ search: keywords.join(" OR "), searchMode: "any", select: "id", top: 25, count: true }),
+    body: JSON.stringify({ search: keywords.join(" OR "), searchMode: "any", select: "id", orderby: "datePublished desc", top: 25, count: true }),
   });
   return rowsFromResponse(parsed);
 }
@@ -105,6 +105,14 @@ async function readNoticeBodies(ids: string[], env: Env) {
 
 function hasNoticeBody(value: unknown): value is HilmaRow {
   return Boolean(value && typeof value === "object" && Object.keys(value as HilmaRow).length > 0);
+}
+
+function isFinnishAndOpen(notice: HilmaRow, deadline: string) {
+  if (text(notice.language).toUpperCase() !== "FI") return false;
+  const date = deadline.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+  if (!date) return false;
+  const deadlineAt = new Date(`${date}T23:59:59.999Z`);
+  return Number.isFinite(deadlineAt.getTime()) && deadlineAt >= new Date();
 }
 
 function isFullyEnriched(content: Record<string, unknown>) {
@@ -152,6 +160,7 @@ export async function syncHilmaWithClient(database: SupabaseClient, companyId: s
     // contain an actual service keyword from their full notice body.
     if (!info.matchingKeywords.length) continue;
     if (!hasNoticeBody(notice)) continue;
+    if (!isFinnishAndOpen(notice, info.deadline)) continue;
     relevant += 1;
     const description = info.description || `${info.matchingKeywords.join(", ")} · Hilmasta haettu tarjouspyyntö.`;
     const reasons = [

@@ -12,7 +12,12 @@ export default async function Offers() {
   const offers: WatchedOffer[] = (data ?? []).filter((offer) => {
     // Hide records created by the initial prototype sync. They contained no
     // notice body and could not be tied to a real Hilma procurement.
-    return !(offer.source === "Hilma" && offer.title === "Hilman hankintailmoitus");
+    if (offer.source !== "Hilma") return true;
+    if (offer.title === "Hilman hankintailmoitus") return false;
+    const content = parseContent(offer.content);
+    const language = String(content.hilmaNotice?.language ?? "").toUpperCase();
+    const deadline = String(content.deadline ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0];
+    return language === "FI" && Boolean(deadline) && new Date(`${deadline}T23:59:59.999Z`) >= new Date();
   }).map((offer) => {
     const content = parseContent(offer.content);
     return {
