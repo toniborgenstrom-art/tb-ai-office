@@ -7,8 +7,12 @@ export default async function OfferRegisterPage() {
   const { data: projectRows } = await supabase.from("projects").select("id,name,location").is("archived_at", null).order("name");
   const { data } = await supabase.from("offers").select("id,title,offer_number,amount,expires_at,status,source,content,project_id,project:projects(name)").order("created_at", { ascending: false });
   const offers: RegisteredOffer[] = (data ?? []).filter((offer) => {
-    // Defensive guard for incomplete rows created by the early Hilma prototype.
-    return !(offer.source === "Hilma" && offer.title === "Hilman hankintailmoitus");
+    if (offer.source !== "Hilma") return true;
+    if (offer.title === "Hilman hankintailmoitus") return false;
+    const content = parseContent(offer.content);
+    const language = String(content.hilmaNotice?.language ?? "").toUpperCase();
+    const deadline = String(content.deadline ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0];
+    return language === "FI" && Boolean(deadline) && new Date(`${deadline}T23:59:59.999Z`) >= new Date();
   }).map((offer) => {
     let content: Record<string, unknown> = {};
     try { content = JSON.parse(offer.content ?? "{}"); } catch { content = { description: offer.content ?? "" }; }
