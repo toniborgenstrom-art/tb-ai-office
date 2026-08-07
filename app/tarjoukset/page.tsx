@@ -14,7 +14,7 @@ export default async function Offers() {
     return {
       id: offer.id, title: offer.title, source: offer.source, fitScore: offer.fit_score,
       description: content.description || "Kuvausta ei ole lisätty.", region: content.region || "", address: content.address || "", serviceType: content.serviceType || "",
-      sourceUrl: content.sourceUrl || "", deadline: content.deadline || "", reasons: Array.isArray(content.reasons) ? content.reasons : [], estimate: content.estimate || "", recommendation: content.recommendation || "Arvioimatta"
+      buyer: content.buyer || "", sourceUrl: content.sourceUrl || "", deadline: content.deadline || "", reasons: Array.isArray(content.reasons) ? content.reasons : [], estimate: content.estimate || "", recommendation: content.recommendation || "Arvioimatta"
     };
   });
   return <Shell><OfferWatch offers={offers} /></Shell>;

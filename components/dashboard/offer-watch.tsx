@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export type WatchedOffer = { id: string; title: string; source: string | null; fitScore: number | null; description: string; region: string; address: string; serviceType: string; sourceUrl: string; deadline: string; reasons: string[]; estimate: string; recommendation: string };
+export type WatchedOffer = { id: string; title: string; source: string | null; fitScore: number | null; description: string; buyer: string; region: string; address: string; serviceType: string; sourceUrl: string; deadline: string; reasons: string[]; estimate: string; recommendation: string };
 
 type EditorProps = { title: string; description: string; region: string; address: string; serviceType: string; source: string; sourceUrl: string; deadline: string };
 const emptyEditor: EditorProps = { title: "", description: "", region: "", address: "", serviceType: "", source: "", sourceUrl: "", deadline: "" };
