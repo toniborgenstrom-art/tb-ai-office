@@ -52,7 +52,7 @@ export function OfferWatch({ offers }: { offers: WatchedOffer[] }) {
     });
     const data = await response.json();
     if (!response.ok) setError(data.error || "Hilma-haku epäonnistui.");
-    else { setError(`Hilma tarkistettu: ${data.found} ilmoitusta, ${data.imported} uutta tallennettu.`); router.refresh(); }
+    else { setError(`Hilma tarkistettu: ${data.found} ilmoitusta, ${data.imported} uutta ja ${data.updated ?? 0} täydennetty.`); router.refresh(); }
     setSyncing(false);
   }
 

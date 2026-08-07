@@ -100,6 +100,16 @@ async function readNoticeBodies(ids: string[], env: Env) {
   return result;
 }
 
+function hasNoticeBody(value: unknown): value is HilmaRow {
+  return Boolean(value && typeof value === "object" && Object.keys(value as HilmaRow).length > 0);
+}
+
+function isFullyEnriched(content: Record<string, unknown>) {
+  // Earlier versions marked a row as fetched even if the notice-body request
+  // failed. Such a row must be retried, otherwise it stays a generic card.
+  return Boolean(content.hilmaDetailFetchedAt && hasNoticeBody(content.hilmaNotice));
+}
+
 function adminClient(env: Env) {
   const url = env("NEXT_PUBLIC_SUPABASE_URL");
   const key = env("SUPABASE_SECRET_KEY");
@@ -115,7 +125,7 @@ export async function syncHilmaWithClient(database: SupabaseClient, companyId: s
   for (const offer of existing ?? []) {
     try {
       const content = JSON.parse(offer.content ?? "{}");
-      if (typeof content.hilmaNoticeId === "string") known.set(content.hilmaNoticeId, { id: offer.id, detailed: Boolean(content.hilmaDetailFetchedAt) });
+      if (typeof content.hilmaNoticeId === "string") known.set(content.hilmaNoticeId, { id: offer.id, detailed: isFullyEnriched(content) });
     } catch { /* ignore legacy manual content */ }
   }
 
@@ -129,7 +139,8 @@ export async function syncHilmaWithClient(database: SupabaseClient, companyId: s
     if (!id) continue;
     const current = known.get(id);
     if (current?.detailed) { relevant += 1; continue; }
-    const info = details({ ...row, ...(bodies.get(id) ?? {}) });
+    const notice = bodies.get(id);
+    const info = details({ ...row, ...(notice ?? {}) });
     if (!info.matchingKeywords.length) info.matchingKeywords.push("Hilma-haku");
     relevant += 1;
     const description = info.description || `${info.matchingKeywords.join(", ")} · Hilmasta haettu tarjouspyyntö.`;
@@ -139,7 +150,7 @@ export async function syncHilmaWithClient(database: SupabaseClient, companyId: s
       info.region ? `Alue: ${info.region}` : "Alue tarkistettava ilmoituksesta",
       info.deadline ? `Määräaika: ${info.deadline}` : "Määräaika tarkistettava ilmoituksesta",
     ];
-    const content = JSON.stringify({ hilmaNoticeId: id, hilmaDetailFetchedAt: new Date().toISOString(), description, buyer: info.buyer, region: info.region, address: info.address, serviceType: info.matchingKeywords[0], sourceUrl: info.url, deadline: info.deadline, publishedAt: info.published, reasons, estimate: "Arvioitava tarjousasiakirjoista", recommendation: "Selvitä lisää", hilmaIndexRow: row, hilmaNotice: bodies.get(id) ?? null });
+    const content = JSON.stringify({ hilmaNoticeId: id, ...(hasNoticeBody(notice) ? { hilmaDetailFetchedAt: new Date().toISOString() } : {}), description, buyer: info.buyer, region: info.region, address: info.address, serviceType: info.matchingKeywords[0], sourceUrl: info.url, deadline: info.deadline, publishedAt: info.published, reasons, estimate: "Arvioitava tarjousasiakirjoista", recommendation: "Selvitä lisää", hilmaIndexRow: row, hilmaNotice: notice ?? null });
     const values = { title: info.title, source: "Hilma", status: "new", fit_score: info.fit, content };
     const { error } = current
       ? await database.from("offers").update(values).eq("id", current.id).eq("company_id", companyId)
