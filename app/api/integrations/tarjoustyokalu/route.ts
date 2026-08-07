@@ -53,9 +53,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Tarjoussynkronointi ei ole viel\u00e4 palvelimella m\u00e4\u00e4ritetty." }, { status: 503 });
   }
 
-  const body = await request.json().catch(() => null) as { email?: unknown; state?: { offers?: unknown } } | null;
+  const body = await request.json().catch(() => null) as { email?: unknown; state?: { offers?: unknown }; deletedOfferIds?: unknown } | null;
   const email = text(body?.email).toLowerCase();
   const toolOffers = Array.isArray(body?.state?.offers) ? body!.state!.offers.filter((item): item is ToolOffer => !!item && typeof item === "object") : [];
+  const deletedOfferIds = Array.isArray(body?.deletedOfferIds) ? body.deletedOfferIds.map(text).filter(Boolean) : [];
   if (!email) return NextResponse.json({ error: "K\u00e4ytt\u00e4j\u00e4n s\u00e4hk\u00f6posti puuttuu." }, { status: 400 });
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
@@ -78,6 +79,14 @@ export async function POST(request: Request) {
   });
 
   let saved = 0;
+  let removed = 0;
+  for (const externalId of deletedOfferIds) {
+    const existingId = existingByExternalId.get(externalId);
+    if (!existingId) continue;
+    const { error: deleteError } = await admin.from("offers").delete().eq("id", existingId).eq("company_id", profile.company_id);
+    if (deleteError) return NextResponse.json({ error: deleteError.message, saved, removed }, { status: 400 });
+    removed += 1;
+  }
   for (const toolOffer of toolOffers) {
     const externalId = text(toolOffer.id);
     if (!externalId) continue;
@@ -110,5 +119,5 @@ export async function POST(request: Request) {
     saved += 1;
   }
 
-  return NextResponse.json({ ok: true, saved });
+  return NextResponse.json({ ok: true, saved, removed });
 }
