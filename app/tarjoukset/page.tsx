@@ -10,9 +10,11 @@ export default async function Offers() {
   const supabase = await createClient();
   const { data } = await supabase.from("offers").select("id,title,source,fit_score,content").order("created_at", { ascending: false });
   const offers: WatchedOffer[] = (data ?? []).filter((offer) => {
+    // Tarjousvahti is reserved for procurement notices. Offers prepared in
+    // Tarjoustyökalu stay in the separate Tarjoukset register.
+    if (offer.source !== "Hilma") return false;
     // Hide records created by the initial prototype sync. They contained no
     // notice body and could not be tied to a real Hilma procurement.
-    if (offer.source !== "Hilma") return true;
     if (offer.title === "Hilman hankintailmoitus") return false;
     const content = parseContent(offer.content);
     const language = String(content.hilmaNotice?.language ?? "").toUpperCase();

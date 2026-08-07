@@ -11,4 +11,6 @@ export default async () => {
   }
 };
 
-export const config = { schedule: "@hourly" };
+// One daily production run keeps the first version inexpensive while the
+// filtering rules are being refined. Manual sync remains available in UI.
+export const config = { schedule: "@daily" };
