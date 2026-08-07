@@ -2,6 +2,10 @@ import { Shell } from "@/components/dashboard/shell";
 import { OfferRegister, type RegisteredOffer } from "@/components/dashboard/offer-register";
 import { createClient } from "@/lib/supabase/server";
 
+function parseContent(content: string | null) {
+  try { return JSON.parse(content ?? "{}"); } catch { return {}; }
+}
+
 export default async function OfferRegisterPage() {
   const supabase = await createClient();
   const { data: projectRows } = await supabase.from("projects").select("id,name,location").is("archived_at", null).order("name");
