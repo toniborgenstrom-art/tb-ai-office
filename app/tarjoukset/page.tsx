@@ -9,7 +9,11 @@ function parseContent(content: string | null) {
 export default async function Offers() {
   const supabase = await createClient();
   const { data } = await supabase.from("offers").select("id,title,source,fit_score,content").order("created_at", { ascending: false });
-  const offers: WatchedOffer[] = (data ?? []).map((offer) => {
+  const offers: WatchedOffer[] = (data ?? []).filter((offer) => {
+    // Hide records created by the initial prototype sync. They contained no
+    // notice body and could not be tied to a real Hilma procurement.
+    return !(offer.source === "Hilma" && offer.title === "Hilman hankintailmoitus");
+  }).map((offer) => {
     const content = parseContent(offer.content);
     return {
       id: offer.id, title: offer.title, source: offer.source, fitScore: offer.fit_score,

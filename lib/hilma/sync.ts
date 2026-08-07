@@ -147,7 +147,11 @@ export async function syncHilmaWithClient(database: SupabaseClient, companyId: s
     if (current?.detailed) { relevant += 1; continue; }
     const notice = bodies.get(id);
     const info = details({ ...row, ...(notice ?? {}) });
-    if (!info.matchingKeywords.length) info.matchingKeywords.push("Hilma-haku");
+    // A search-index hit is not automatically relevant. Do not create a
+    // generic card for old or unrelated notices; only persisted notices must
+    // contain an actual service keyword from their full notice body.
+    if (!info.matchingKeywords.length) continue;
+    if (!hasNoticeBody(notice)) continue;
     relevant += 1;
     const description = info.description || `${info.matchingKeywords.join(", ")} · Hilmasta haettu tarjouspyyntö.`;
     const reasons = [
