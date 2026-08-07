@@ -10,7 +10,14 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   const { data: review, error: reviewError } = await supabase.from("document_ai_reviews").select("id,source_text").eq("document_id", id).eq("company_id", companyId).maybeSingle();
   if (reviewError || !review) return NextResponse.json({ error: "Asiakirjan sisältö ei ole vielä käytettävissä. Varmista, että Supabase-migraatio on ajettu ja tallenna katselmus pilveen uudelleen." }, { status: 404 });
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const result = await client.chat.completions.create({ model: process.env.OPENAI_MODEL ?? "gpt-4.1-mini", temperature: 0.2, messages: [{ role: "system", content: "Olet LVI-valvonnan asiakirja-avustaja. Tee vain annetun aineiston perusteella suomenkielinen, tarkistettava yhteenveto. Älä keksi teknisiä, juridisia tai sopimuksellisia tietoja. Vastaa otsikoilla: Yhteenveto, Havaittavat jatkotoimet, Raporttiluonnos." }, { role: "user", content: review.source_text.slice(0, 45000) }] });
+  let result;
+  try {
+    result = await client.chat.completions.create({ model: process.env.OPENAI_MODEL ?? "gpt-4.1-mini", temperature: 0.2, messages: [{ role: "system", content: "Olet LVI-valvonnan asiakirja-avustaja. Tee vain annetun aineiston perusteella suomenkielinen, tarkistettava yhteenveto. Älä keksi teknisiä, juridisia tai sopimuksellisia tietoja. Vastaa otsikoilla: Yhteenveto, Havaittavat jatkotoimet, Raporttiluonnos." }, { role: "user", content: review.source_text.slice(0, 45000) }] });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : "tuntematon virhe";
+    console.error("Document AI analysis:", message);
+    return NextResponse.json({ error: `AI-yhteenveto ei onnistunut palvelimella: ${message}` }, { status: 502 });
+  }
   const draft = result.choices[0]?.message.content ?? "Luonnosta ei saatu muodostettua.";
   const { error: updateError } = await supabase.from("document_ai_reviews").update({ summary: draft, draft, status: "ready", updated_at: new Date().toISOString() }).eq("id", review.id).eq("company_id", companyId);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
