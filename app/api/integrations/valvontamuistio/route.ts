@@ -8,6 +8,7 @@ type MemoProject = {
   reportNumber?: unknown;
   reportDate?: unknown;
   updatedAt?: unknown;
+  officeInspectionId?: unknown;
   state?: { fields?: Record<string, unknown> };
 };
 
@@ -75,6 +76,12 @@ export async function POST(request: Request) {
     const sourceText = JSON.stringify({ title, target, reportNumber: text(project.reportNumber), reportDate: text(project.reportDate), fields }, null, 2);
     const review = await admin.from("document_ai_reviews").upsert({ company_id: profile.company_id, document_id: documentId, source_text: sourceText, status: "pending", updated_at: new Date().toISOString() }, { onConflict: "document_id" });
     if (review.error) return NextResponse.json({ error: `Katselmuksen sisällön tallennus epäonnistui: ${review.error.message}` }, { status: 400 });
+  }
+
+  const inspectionId = text(project.officeInspectionId);
+  if (inspectionId) {
+    const update = await admin.from("project_inspections").update({ status: "completed", updated_at: new Date().toISOString() }).eq("id", inspectionId).eq("company_id", profile.company_id);
+    if (update.error && !update.error.message.includes("project_inspections")) return NextResponse.json({ error: update.error.message }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true, documentId: documentId ?? null, assigned: Boolean(existing?.project_id) });
