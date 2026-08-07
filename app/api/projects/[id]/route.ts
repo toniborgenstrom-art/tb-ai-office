@@ -24,6 +24,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!customer) return NextResponse.json({ error: "Tilaajaa ei löytynyt." }, { status: 404 });
     payload.customer_id = body.customerId;
   }
+  if ("customerName" in body) {
+    if (typeof body.customerName !== "string") return NextResponse.json({ error: "Virheellinen tilaajan nimi." }, { status: 400 });
+    const customerName = body.customerName.trim();
+    if (customerName && typeof body.customerId === "string" && body.customerId) {
+      const { error: customerUpdateError } = await supabase.from("customers").update({ name: customerName }).eq("id", body.customerId).eq("company_id", companyId);
+      if (customerUpdateError) return NextResponse.json({ error: customerUpdateError.message }, { status: 400 });
+    }
+  }
   const { error: updateError } = await supabase.from("projects").update(payload).eq("id", id).eq("company_id", companyId);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
   return NextResponse.json({ ok: true });
