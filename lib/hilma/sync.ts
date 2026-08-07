@@ -35,7 +35,10 @@ function deepText(value: unknown, keys: string[]): string {
     seen.add(current);
     for (const [key, child] of Object.entries(current as HilmaRow)) {
       if (wanted.has(normal(key))) {
-        const candidate = text(child) || (Array.isArray(child) ? child.map(text).filter(Boolean).join(", ") : "");
+        // Hilma stores several Finnish-language fields as nested objects
+        // (for example { fi: "..." }). Flatten the value rather than only
+        // accepting an immediate string, so title, buyer and deadline survive.
+        const candidate = flatten(child).trim();
         if (candidate) return candidate;
       }
       if (child && typeof child === "object") queue.push(child);
@@ -119,13 +122,16 @@ function adminClient(env: Env) {
 
 export async function syncHilmaWithClient(database: SupabaseClient, companyId: string, env: Env = (name) => process.env[name]) {
   const rows = await searchHilma(env);
-  const { data: existing, error: existingError } = await database.from("offers").select("id,content").eq("company_id", companyId).eq("source", "Hilma");
+  const { data: existing, error: existingError } = await database.from("offers").select("id,title,content").eq("company_id", companyId).eq("source", "Hilma");
   if (existingError) throw new Error(existingError.message);
   const known = new Map<string, { id: string; detailed: boolean }>();
   for (const offer of existing ?? []) {
     try {
       const content = JSON.parse(offer.content ?? "{}");
-      if (typeof content.hilmaNoticeId === "string") known.set(content.hilmaNoticeId, { id: offer.id, detailed: isFullyEnriched(content) });
+      if (typeof content.hilmaNoticeId === "string") {
+        const isGenericLegacyCard = offer.title === "Hilman hankintailmoitus";
+        known.set(content.hilmaNoticeId, { id: offer.id, detailed: isFullyEnriched(content) && !isGenericLegacyCard });
+      }
     } catch { /* ignore legacy manual content */ }
   }
 
